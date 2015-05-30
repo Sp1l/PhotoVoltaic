@@ -40,14 +40,14 @@ add () {
 }
 
 splitAdd () {
-  # Split 123.4/321.0 and add values
+	# Split 123.4/321.0 and add values
 	local input=$1
 	local sep=$2
 	add ${input%${sep}*} ${input#*${sep}}
 }
 
 retrieveData () {
-  # Pull data from goodwe-power.com and rip out values
+	# Pull data from goodwe-power.com and rip out values
 	while : ; do
 		payload=`curl -qo - -m 10 "${goodweUrl}?ID=${stationId}"`
 		[ $? -eq 0 ] && break
@@ -57,7 +57,7 @@ retrieveData () {
 }
 
 extractData () {
-  # Process the values into corresponding variables
+	# Process the values into corresponding variables
 	local cnt=0
 	for line in $source ; do
 		cnt=$((cnt+1))
@@ -79,12 +79,12 @@ extractData () {
 }
 
 waitTillSunrise () {
-  # No need to poll or push when the sun isn't shining
+	# No need to poll or push when the sun isn't shining
 	now=`date '+%s'`
 	sunrise=`sscalc -a $latitude -o $longitude -f '%s'`
 	sunset=${sunrise#*  }
 	sunrise=${sunrise%  *}
-  if [ $now -lt $sunrise ] && sleep $((sunrise-now))
+	if [ $now -lt $sunrise ] && sleep $((sunrise-now))
 	if [ $now -gt $sunset ] ; then
 		local tomorrow=`date -v +1d '+%m-%d'` 
 		sunrise=`sscalc -d ${tomorrow#*-} -m ${tomorrow%-*} \
@@ -119,13 +119,13 @@ while : ; do # Infinite loop
 		RC=$?
 		if [ $RC = 0 ] ; then
 			lastOKtoday=${today}${time%:*}${time#*:}
-    	now=`date "+%s"`
-    	sleep $((lastStart-now+interval))
+			now=`date "+%s"`
+			sleep $((lastStart-now+interval))
 		else
 			echo Error $postResp
 			sleep 60
 		fi
 	else
-	  waitTillSunrise
+		waitTillSunrise
 	fi
 done
