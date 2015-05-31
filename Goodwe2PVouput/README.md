@@ -3,6 +3,7 @@ Goodwe mobile to PVoutput.org logger
  * Web-scraping from the Mobile UI pages (json)
  * Uses Mobile/GetPacLineChart resource for data (10 min interval)
 
+## History
  - v1.0 Not published
  - v1.1 Adds dusk/dawn margin
 
@@ -10,7 +11,9 @@ Goodwe mobile to PVoutput.org logger
 Goodwe portal to PVoutput.org logger
  * Web-scraping from http://goodwe-power.com
  * Uses the Realtime tab (InverterDetail) as that contains most detail
+ * Updates current output, voltage, inverter temperature
 
+## History
  - v1.0 Initial published version
  - v1.1 Adds dusk/dawn margin
  
