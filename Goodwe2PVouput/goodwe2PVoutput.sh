@@ -27,6 +27,7 @@ outputPath='<Where to store the csv>'
 
 # Global settings
 interval=$((4*60)) #seconds
+margin=$((20*60))
 goodweUrl='http://goodwe-power.com/PowerStationPlatform/PowerStationReport/InventerDetail'
 pvoutputUrl='http://pvoutput.org/service/r2/addstatus.jsp'
 
@@ -91,7 +92,7 @@ waitTillSunrise () {
 							 -a $latitude -o $longitude -f '%s'`
 		sunset=${sunrise#*  }
 		sunrise=${sunrise%  *}
-		sleep $((sunrise-now))	
+		sleep $((sunrise-now-margin))	
 	fi
 	today=`date '+%Y%m%d'`
 }
@@ -101,7 +102,7 @@ waitTillSunrise # sets today, sunrise, sunset
 while : ; do # Infinite loop
 	lastStart=`date '+%s'`
 
-	if [ $lastStart -lt $((sunset+interval)) ] ; then
+	if [ $lastStart -lt $((sunset+margin)) ] ; then
 		timestamp=`date '+%Y-%m-%d %H:%M:%S'`
 		time=${timestamp#* } ; time=${time%:*} # Extract HH:MM
 		retrieveData
