@@ -17,13 +17,8 @@
 # We report every 4 minutes so set PVoutput to 5 minute interval so
 # you capture all available measurements
 
-# User Specific Settings
-stationId='<your Goodwe-power.com stationID>'
-apiKey='<your PVoutput.org API key>' 
-sysId='<This systems PVoutput.org system number'
-latitude=<latitude of your installation>
-longitude=-<longitude of your installation>
-outputPath='<Where to store the csv>'
+# Add your User Specific Settings in config.sh
+. ./config.sh
 
 # Global settings
 interval=$((4*60)) #seconds
