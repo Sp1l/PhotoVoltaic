@@ -80,7 +80,7 @@ waitTillSunrise () {
 	sunrise=`sscalc -a $latitude -o $longitude -f '%s'`
 	sunset=${sunrise#*  }
 	sunrise=${sunrise%  *}
-	if [ $now -lt $sunrise ] && sleep $((sunrise-now))
+	[ $now -lt $sunrise ] && sleep $((sunrise-now))
 	if [ $now -gt $sunset ] ; then
 		local tomorrow=`date -v +1d '+%m-%d'` 
 		sunrise=`sscalc -d ${tomorrow#*-} -m ${tomorrow%-*} \
