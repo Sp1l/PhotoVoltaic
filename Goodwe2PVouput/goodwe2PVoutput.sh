@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# goodwe2PVoutput v1.1
+# goodwe2PVoutput v1.2
 # Goodwe portal to PVoutput.org logger
 # Web-scraping from http://goodwe-power.com
 # Uses the Realtime tab (InverterDetail) as that contains most detail
