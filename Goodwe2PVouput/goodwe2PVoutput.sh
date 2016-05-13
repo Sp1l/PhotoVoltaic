@@ -97,7 +97,7 @@ retrieveData () {
 		echo "Problem fetching from Goodwe, retry in 60s"
 		sleep 60
 	done
-	source=`echo "$payload" | sed -ne '/<tr class="DG_Item">/,/<\/tr>/!d;/<td><\/td>/d;s/ //g;s/<\/*td>//gp'`
+	source=`echo "$payload" | sed -ne '/<tbody>/,/<\/tbody>/!d;/<td><\/td>/d;s/ //g;s/<\/*td>//gp'`
 }
 
 extractData () {
