@@ -95,7 +95,7 @@ done
 
 } # processDate 
 
-TMPFILE=`mktemp -t $(basename $0)`
+TMPFILE=`mktemp -t $(basename $0).XXXXXX`
 
 . ./config.sh
 
