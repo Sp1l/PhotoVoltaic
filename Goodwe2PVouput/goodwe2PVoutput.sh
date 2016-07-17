@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# goodwe2PVoutput v1.2
+# goodwe2PVoutput v2.0
 # Goodwe portal to PVoutput.org logger
 # Web-scraping from http://goodwe-power.com
 # Uses the Realtime tab (InverterDetail) as that contains most detail
@@ -97,29 +97,87 @@ retrieveData () {
 		echo "Problem fetching from Goodwe, retry in 60s"
 		sleep 60
 	done
-	source=`echo "$payload" | sed -ne '/<tbody>/,/<\/tbody>/!d;/<td><\/td>/d;s/ //g;s/<\/*td>//gp'`
+	sourceTable=`echo "$payload" | sed -nEe 's/^[[:space:]]*//;/^$/d;/"tab_big"/,/\/table/p'`
+#	source=`echo "$payload" | sed -ne '/<tbody>/,/<\/tbody>/!d;/<td><\/td>/d;s/ //g;s/<\/*td>//gp'`
 }
 
 extractData () {
-	# Process the values into corresponding variables
-	local cnt=0
-	for line in $source ; do
-		cnt=$((cnt+1))
-		case $cnt in
-			4)  outPower=${line%W*} ;;
-			5)  todayProd=${line%kWh*} ;;
-			8)  inVoltage=${line%V*} ;;
-			9)  inCurrent=${line%A*} ;;
-			10) outVoltage=${line%%/*} ;;
-			11) outCurrent=${line%%/*} ;;
-			12) outFrequency=${line%%/*} ;;
-			13) temperature=${line%℃*} ;;
+
+	processDGHeader () {
+		local source=`echo $sourceTable | sed -n '/<td/s/></>empty</;s/<\/td>//;s/<td.*>//p' | tr -dc '[A-Za-z0-9./\n]'`
+		# Old method from before the goodwe-power website redesign
+		# Process the values into corresponding variables
+		local cnt=0
+		for line in $source ; do
+			cnt=$((cnt+1))
+			case $cnt in
+				4)  outPower=${line%W*} ;;
+				5)  todayProd=${line%kWh*} ;;
+				8)  inVoltage=${line%V*} ;;
+				9)  inCurrent=${line%A*} ;;
+				10) outVoltage=${line%%/*} ;;
+				11) outCurrent=${line%%/*} ;;
+				12) outFrequency=${line%%/*} ;;
+				13) temperature=${line%℃*} ;;
+			esac
+		done
+	}
+
+	# Detect different page types
+   if [ "${sourceTable%%DG_Header*}" != "${sourceTable}" ] ; then
+		# Make sure all headers contain labels (2 columns have a <span> as descr on separate line)
+		local source=`echo "${sourceTable}" | \
+			tr "\r\n" "|" | \
+			sed -e 's#td class="width[0-9]*">||<span  title="[^"]*">#td class="width120">#g;s#</span>||</td>#</td>#g;s#||#|#g;s#|$##' | \
+			tr '|' '\n'`
+		# Extract headers <th scope> from source
+		local headers=`echo "${source}" | \
+			sed -n '/<td class/s/></>empty</;/<td class/s/<\/td>//;s/<td class="width[0-9]*">//p' | \
+			tr -dc '[A-Za-z\n]' | tr '\n' ' '`
+		# Extract values <td> from source
+		local values=`echo "${source}"  | \
+			sed -n '/<td>/s/>[[:space:]]*</>empty</;/<td>/s/<\/td>//;s/<td>//p' | \
+			tr -dc '[A-Za-z0-9./\n]' | tr '\n' ' '`
+	elif [ "${sourceTable%%th scope=*}" != "${sourceTable}" ] ; then
+		# Make sure all headers contain labels (2 columns have a <span> as descr on separate line)
+		local source=`echo "${sourceTable}" | \
+			tr "\r\n" "|" | \
+			sed -e 's#scope="col">||<span  title="[^"]*">#scope="col">#g;s#</span>||</th>#</th>#g;s#||#|#g;s#|$##' | \
+			tr '|' '\n'`
+		# Extract headers <th scope> from source
+		local headers=`echo "${source}" | \
+			sed -n '/<th scope/s/></>empty</;s/<th scope="col">//;s/<\/th>//p' | \
+			tr -dc '[A-Za-z\n]' | tr '\n' ' '`
+		# Extract values <td> from source
+		local values=`echo "${source}"  | \
+			sed -n '/<td/s/></>empty</;s/<\/td>//;s/<td.*>//p' | \
+			tr -dc '[A-Za-z0-9./\n]' | tr '\n' ' '`
+	fi
+
+   for line in $headers ; do
+		local value=${values%% *} # Store first value
+		values=${values#* }        # Remove first value
+		case "$line" in
+			PGrid)       outPower=${value%W*} ;;
+			EDay)        todayProd=${value%kWh*} ;;
+			Vpv)         inVoltage=${value%V*} ;;
+			Ipv)         inCurrent=${value%A*} ;;
+			Vac)         outVoltage=${value%%/*} ;;
+			Iac)         outCurrent=${value%%/*} ;;
+			Fac)         outFrequency=${value%%/*} ;;
+			Temperature) temperature=${value%℃*} ;;
 		esac
 	done
-	local v1=${inVoltage%/*} ; local v2=${inVoltage#*/} # Split values
-	local a1=${inCurrent%/*} ; local a2=${inCurrent#*/}
+	
+	local v1=0 ; local v2=0 ; local a1=0 ; local a2=0
+	[ "${inVoltage}" != "empty" ] && \
+		local v1=${inVoltage%/*} ; local v2=${inVoltage#*/} # Split values
+	[ "${inCurrent}" != "empty" ] && \
+		local a1=${inCurrent%/*} ; local a2=${inCurrent#*/}
 	inPower=`bc -e "scale=2;($v1*$a1)+($v2*$a2)" -e quit`
-	efficiency=`bc -e "scale=2;$outPower / $inPower" -e quit` 
+	efficiency=0
+	[ "${outPower}" != "empty" -a ${inPower%.*} -gt 0 ] &&
+		efficiency=`bc -e "scale=2;$outPower / $inPower" -e quit` 
 }
 
 waitTillSunrise () {
@@ -157,15 +215,16 @@ while : ; do # Infinite loop
 		echo $timestamp, $todayProd, $efficiency, $inVoltage, $inCurrent, $inPower, \
 			  $outVoltage, $outCurrent, $outPower, $temperature
 		v6=`splitAdd $inVoltage /`
-		postResp=`curl -s --url "${pvoutputUrl}" \
+		postResp=`curl -si --url "${pvoutputUrl}" \
 				-H "X-Pvoutput-Apikey: ${apiKey}" -H "X-Pvoutput-SystemId: ${sysId}" \
-				-d "d=${today}" -d "t=${time}" -d "v2=${outPower}" \
-				-d "v5=${temperature}" -d "v6=${v6}"`
+				-H "X-Rate-Limit: 1" -d "d=${today}" -d "t=${time}" \
+				-d "v2=${outPower}" -d "v5=${temperature}" -d "v6=${v6}"`
 		RC=$?
 		if [ $RC = 0 ] ; then
 			lastOKtoday=${today}${time%:*}${time#*:}
+			limitLeft=`echo "${postResp}" | sed -n 's/^X-Rate-Limit-Remaining: \([0-9]*\)/\1/p'`
 		    	now=`date "+%s"`
-			echo "Sleep for $((lastStart-now+interval)) seconds"
+			echo "Rate Limit Remaining: ${limitLeft}; Sleep for $((lastStart-now+interval)) seconds"
 		    	sleep $((lastStart-now+interval))
 		else
 			echo Error $postResp
