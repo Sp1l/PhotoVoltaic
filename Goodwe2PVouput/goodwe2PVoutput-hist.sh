@@ -1,6 +1,7 @@
 #!/bin/sh
 # Original: Kire Pudsje, march 2016
 # Modified: Bernard Spil, 13 March 2016
+# v2.0 2017-12-16
 
 usage () {
 cat << END_OF_USAGE
@@ -19,6 +20,12 @@ add () {
 	echo $one.$two
 }
 
+loginGoodwe () {
+	local loginURL="http://goodwe-power.com/User/Login"
+	local curlOpts="-d username=${username} -d password=${password}"
+	curl -s -c goodwe.cookies ${curlOpts} ${loginURL}
+}
+
 processDate () {
 # The actual workhorse of the script
 
@@ -33,49 +40,54 @@ queryDate="$1"
 # 1. Retrieve data from Goodwe
 # 2. Strip out unneeded output
 # 3. One line per timeseries
-timeSeries=`curl -s -d "InventerSN=${inverterSN}&QueryType=0&DateFrom=${queryDate}&PowerStationID=${stationId}" \
-	http://www.goodwe-power.com/PowerStationPlatform/PowerStationReport/QueryTypeChanged \
-	| sed 's/quot;//g;s/{"YAxis":"{name://;s/{name:/|/g;s/}[,]*//g;s/","XAxis":".*//' \
-	| tr '|' '\n'`
-# Returns a set of lines like
-# PGrid(W),data:[0,0,0,0,63,93,111,176,205,...]
-# Temperature(?),data:[0,0,0,0,9.6,10.1,10.9,11.9,...]
-# Each data-point is an increment of 10 minutes starting with 00:00
-# (24*6) 144 data-points per day 
+#timeSeries=`curl -s -d "InventerSN=${inverterSN}&QueryType=0&DateFrom=${queryDate}&PowerStationID=${stationId}" \
+#	http://www.goodwe-power.com/PowerStationPlatform/PowerStationReport/QueryTypeChanged \
+#	| sed 's/quot;//g;s/{"YAxis":"{name://;s/{name:/|/g;s/}[,]*//g;s/","XAxis":".*//' \
+#	| tr '|' '\n'`
 
-# Extract relevant timeseries from the list of timeseries
-# and remove prefix and suffix
-PGrid=`echo -e "$timeSeries" | sed -n 's/^PGrid(W),data:\[\(.*\)]$/\1/p' | tr ',' ' '`
-Vpv1=`echo  -e "$timeSeries" | sed -n 's/^Vpv1(V),data:\[\(.*\)]$/\1/p'`
-Vpv2=`echo  -e "$timeSeries" | sed -n 's/^Vpv2(V),data:\[\(.*\)]$/\1/p'`
-Temperature=`echo -e "$timeSeries" | sed -n 's/^Temperature(.),data:\[\(.*\)]$/\1/p'`
-# Each timeseries is a list of values separated by a ',' (comma)
-# Except for PGrid which is separated by ' ' for splitting with `for`
+curl -s -c goodwe.cookies -o $TMPFILE \
+	-d "PowerStationID=${stationId}&PacDateStart=${queryDate}" \
+	http://goodwe-power.com/PowerStationPlatform/PowerStationReport/PacQueryTypeChangedForFiveMin
+# Returns a json structure (quot; replaced by a quote)
+# {"PacXAxis":"'0','5','10','15','20',etc",
+# "PacYAxis":"0,0,63,91,91,108,108,151,123,123,etc",
+# "PacXAxis_PowerFromGrid":"'0','5','10','15','20',etc",
+# "PacYAxis_PowerFromGrid":"0,0,0,0,0,0,0,0,0,0,0,0",
+# "powerInfo":"{\"Pac\":\"0.000\",\"EDay\":\"2.2\",etc}"}
+# We're interested in the PacYAxis array as that contains the power output
+# (24*12) 288 data-points per day 
+
+local PGrid=`cat $TMPFILE | \
+	sed 's/","/"|"/g;s/"//g' | \
+	tr '|' '\n' | \
+	sed -n 's/,/ /g;s/PacYAxis://p'`
+# timeSeries is now a space-separated list of values
 
 outputDate=`date -j -f '%Y-%m-%d' ${queryDate} '+%Y%m%d'`
+
+# Log to file as well
+echo -n > ${queryDate}-hist.csv
 
 local hour=00
 local minute=00
 local n=0
+local data=""
 for outPower in ${PGrid} ; do
-	# Get first value in timeseries and remove first value
-	local v1=${Vpv1%%,*} ; Vpv1=${Vpv1#*,}
-	local v2=${Vpv2%%,*} ; Vpv2=${Vpv2#*,}
-	local temperature=${Temperature%%,*} ; Temperature=${Temperature#*,}
-	inVoltage=`add $v1 $v2`
+	echo "${outputDate},${hour}:${minute},-1,${outPower}" >> ${queryDate}.csv
 	if [ ${outPower} -ne 0 ] ; then
-		data="${data}${outputDate},${hour}:${minute},-1,${outPower},-1,-1,${temperature},${inVoltage};"
-		# Insert space for posting max 30 per call
+		data="${data}${outputDate},${hour}:${minute},-1,${outPower};"
+		# Insert space for posting max 30/100 per call
 		[ $((n+=1)) -ge ${batchSize} ] && { n=0 ; data="${data} " ; }
 	fi
 
-	# Increase minute (and hour)
-	minute=$((minute+10))
+	# Increase minute (and hour) without forking
+	minute=$((minute+5))
 	if [ ${minute} -eq 60 ] ; then
 		hour=${hour#0} ; hour=$((hour+1))
 		[ ${hour} -le 9 ] && hour=0${hour}
 		minute=00
 	fi
+	[ ${minute} = 5 ] && minute=05
 done
 
 for postData in $data ; do
@@ -95,7 +107,7 @@ done
 
 } # processDate 
 
-TMPFILE=`mktemp -t $(basename $0).XXXXXX`
+TMPFILE=`mktemp -t $(basename $0)`
 
 . ./config.sh
 
@@ -103,7 +115,7 @@ case ${donation} in
 	[Yy][Ee][Ss] )
 			rateLimit=300
 			backoff=50
-			batchSize=30
+			batchSize=100
 		;;
 	* )
 			rateLimit=60
@@ -111,6 +123,8 @@ case ${donation} in
 			batchSize=30
 		;;
 esac
+
+loginGoodwe
 
 case $# in
   1 ) date -j -f '%Y-%m-%d' "$1" 1>/dev/null 2>&1 || { echo "Error: Date \"$1\" invalid, format YYYY-MM-DD"; exit 1; }
@@ -131,3 +145,5 @@ case $# in
     ;;
   * ) usage ;;
 esac
+
+rm ${TMPFILE}
