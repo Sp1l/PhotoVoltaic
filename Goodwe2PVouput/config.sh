@@ -6,6 +6,12 @@
 stationId="<your Goodwe-power.com stationID>"
 # Inverter S/N
 inverterSN="<The inverter's serial number>"
+# goodwe-power.com username
+username="<username>"
+# goodwe-power.com password
+password="<password>"
+# Where to store the cookies from goodwe
+cookieFile="</path/and/file>"
 
 ### PVOutput settings
 # Find or generate "API Key" in "Settings"
