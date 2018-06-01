@@ -2,6 +2,11 @@
 # Original: Kire Pudsje, march 2016
 # Modified: Bernard Spil, 13 March 2016
 # v2.0 2017-12-16
+# v2.0.1 2018-06-01
+#    * Make host modifiable
+
+# Use goodwe-power.com for non-EU installations
+goodweHost="https://eu.goodwe-power.com"
 
 usage () {
 cat << END_OF_USAGE
@@ -21,7 +26,7 @@ add () {
 }
 
 loginGoodwe () {
-	local loginURL="http://goodwe-power.com/User/Login"
+	local loginURL="http://${goodweHost}/User/Login"
 	local curlOpts="-d username=${username} -d password=${password}"
 	curl -s -c goodwe.cookies ${curlOpts} ${loginURL}
 }
@@ -47,7 +52,7 @@ queryDate="$1"
 
 curl -s -c goodwe.cookies -o $TMPFILE \
 	-d "PowerStationID=${stationId}&PacDateStart=${queryDate}" \
-	http://goodwe-power.com/PowerStationPlatform/PowerStationReport/PacQueryTypeChangedForFiveMin
+	http://${goodweHost}/PowerStationPlatform/PowerStationReport/PacQueryTypeChangedForFiveMin
 # Returns a json structure (quot; replaced by a quote)
 # {"PacXAxis":"'0','5','10','15','20',etc",
 # "PacYAxis":"0,0,63,91,91,108,108,151,123,123,etc",
@@ -93,7 +98,7 @@ done
 for postData in $data ; do
 	response=`curl -s -i -o- -d "data=$postData" \
 					-H "X-Pvoutput-Apikey: ${apiKey}" -H "X-Pvoutput-SystemId: ${sysId}" -H "X-Rate-Limit: 1" \
-					http://pvoutput.org/service/r2/addbatchstatus.jsp | tr -d '\r'`
+					https://pvoutput.org/service/r2/addbatchstatus.jsp | tr -d '\r'`
 	respStatus=`echo "${response}" | sed -n 's/^HTTP[^ ]* \([0-9]*\) .*/\1/p' | tail -n 1`
 	[ ${respStatus} -ge 300 ] && { echo -e "Error when sending data to PVOutput:\n${response}" ; exit 1 ; }
 	limitLeft=`echo "${response}" | sed -n 's/^X-Rate-Limit-Remaining: \([0-9]*\)/\1/p'`
