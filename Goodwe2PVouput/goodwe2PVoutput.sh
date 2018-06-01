@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# goodwe2PVoutput v2.1
+# goodwe2PVoutput v2.1.1
 # Goodwe portal to PVoutput.org logger
 # Web-scraping from http://goodwe-power.com
 # Uses the Realtime tab (InverterDetail) as that contains most detail
@@ -26,9 +26,10 @@ interval=$((4*60)) #seconds
 # dusk/dawn margin
 margin=$((15*60)) # seconds
 # URL to retrieve the source data from
-goodweUrl='http://goodwe-power.com/PowerStationPlatform/PowerStationReport/InventerDetail'
+# for non-EU installations the host is goodwe-power.com
+goodweUrl='https://eu.goodwe-power.com/PowerStationPlatform/PowerStationReport/InventerDetail'
 # URL to post the target data to
-pvoutputUrl='http://pvoutput.org/service/r2/addstatus.jsp'
+pvoutputUrl='https://pvoutput.org/service/r2/addstatus.jsp'
 
 scriptDir="${0%/*}"
 scriptName="${0##*/}"
