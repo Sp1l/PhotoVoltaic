@@ -8,6 +8,9 @@
 # Use goodwe-power.com for non-EU installations
 goodweHost="https://eu.goodwe-power.com"
 
+echo "This script no longer works, go to eu.semsportal.com"
+exit 1
+
 usage () {
 cat << END_OF_USAGE
 Usage: $0 <start-date>

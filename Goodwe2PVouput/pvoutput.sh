@@ -14,6 +14,9 @@ outputPath='<Where to store the csv>'
 goodweUrl='http://www.goodwe-power.com/Mobile/GetPacLineChart'
 pvoutputUrl='http://pvoutput.org/service/r2/addstatus.jsp'
 
+echo "This script no longer works, go to eu.semsportal.com"
+exit 1
+
 retrieveData () {
 	local payload
 	while : ; do

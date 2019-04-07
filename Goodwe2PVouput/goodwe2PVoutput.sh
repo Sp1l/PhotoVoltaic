@@ -210,6 +210,8 @@ waitTillSunrise () {
 	today=`date '+%Y%m%d'`
 }
 
+exitErr "This script no longer works"
+
 loadConfig "$*"
 
 # Redirect output and error to file

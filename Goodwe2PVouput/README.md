@@ -1,5 +1,10 @@
 
+Early 2019, Goodwe killed the original scripts using goodwe-portal.com.
+
+SEMS2PVoutput.sh is the replacement, using the new Goodwe API
+
 # goodwe2PVoutput.sh
+*NO LONGER WORKS*
 Goodwe portal to PVoutput.org logger
  * Web-scraping from http://goodwe-power.com
  * Uses the Realtime tab (InverterDetail) as that contains most detail
@@ -17,6 +22,7 @@ Goodwe portal to PVoutput.org logger
  * Update PVoutput every 4 minutes to capture all changes (and set update frequency to 5 minutes)
 
 # goodwe2PVoutput-hist.sh
+*NO LONGER WORKS*
 Goodwe portal "History" to PVoutput.org logger
  * Accepts date in the past
    - 90 days if you've donated
@@ -29,6 +35,7 @@ Goodwe portal "History" to PVoutput.org logger
  - v1.0 2016-03-13 Initial published version
 
 # pvoutput.sh
+*NO LONGER WORKS*
 Simpler Goodwe mobile to PVoutput.org logger
  * Web-scraping from the Mobile UI pages (json)
  * Uses Mobile/GetPacLineChart resource for data (10 min interval)
