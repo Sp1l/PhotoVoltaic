@@ -227,8 +227,6 @@ exec 2<&-
 exec 1>>${outputPath}/${logFile}.out
 exec 2>>${outputPath}/${logFile}.err
 
-set -x
-
 loginGoodwe # sets token initially
 
 today=0
