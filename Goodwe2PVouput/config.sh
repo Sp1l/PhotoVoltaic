@@ -29,4 +29,13 @@ longitude=-<longitude of your installation>
 ### Settings for this machine
 # Where you want to store the output CSV files
 outputPath="<Where to store the csv>"
+# Prefix for the logfiles (defaults to script name)
+logFile="<filename prefix>"
+
+### For debugging (Uncomment if you want them)
+# Log more output
+# DEBUG=true
+# Run only once and exit, skip "wait till sunrise"
+# ONESHOT=true
+
 
