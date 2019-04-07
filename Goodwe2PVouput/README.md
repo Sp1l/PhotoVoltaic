@@ -12,6 +12,11 @@ Goodwe API to PVoutput.org logger
 ## History
  - v3.0 Initial published rewritten version
 
+# goodwe.php
+PHP script to intercept the calls from the inverter to goodwe-portal.com
+
+Find a complete description [on my personal blog](https://brnrd.eu/misc/2019-03-23/killing-the-internet-of-shit.html).
+
 # goodwe2PVoutput.sh
 **NO LONGER WORKS**
 
