@@ -3,30 +3,45 @@
 define('SAFE_ENTRY', true);
 define('VERSION'   , '2019-03-31_1');
 
+// ini_set('display_errors', 1);
+// error_reporting(E_ALL);
+
 /** Define ABSPATH as this file's directory */
 if ( ! defined( 'ABSPATH' ) ) {
     define('ABSPATH', dirname( __FILE__ ) . '/' );
 }
 
-define( "LOGLEVEL", array('emergency' => 0, 'alert' => 1, 'critical' => 2, 
-    'error' => 3, 'warning' => 4, 'notice' => 5, 'info' => 6,'debug' => 7));
+# ini_set('display_errors', 1);
+# error_reporting(E_ALL);
+
+define( "LOGLEVEL",
+    array(
+        'emergency' => 0,
+        'alert' => 1,
+        'critical' => 2, 
+        'error' => 3,
+        'warning' => 4,
+        'notice' => 5,
+        'info' => 6,
+        'debug' => 7
+    )
+);
 
 // Load configuration
 require_once( ABSPATH . "config.inc.php");
 
-// DNS functions
-include_once('dns.inc.php');
-
-function logthis ($severity, $message) {
 // Log errors to file
+function logger ($severity, $message) {
     global $today, $now, $config;
     if ( is_null(LOGLEVEL[strtolower($severity)]) || 
          LOGLEVEL[strtolower($severity)] > LOGLEVEL[strtolower($config['logLevel'])] ) { 
         return; // Don't log, loglevel is lower than severity
     }
     try {
-        file_put_contents($config['outputPath'].'/error.log', $today.' '.$now.' '
-            .strtoupper($severity).': '.$message.PHP_EOL, FILE_APPEND);
+        file_put_contents(
+            $config['outputPath'].'/error.log',
+            $today.' '.$now.' '.strtoupper($severity).': '.$message.PHP_EOL,
+            FILE_APPEND);
     } catch (Exception $e) {
         http_response_code(500);
         print 'Cannot create file '.$config['outputPath'].'/error.log';
@@ -34,25 +49,28 @@ function logthis ($severity, $message) {
     }
 }
 
-function logPayload ($datapath, $payload) {
 // base64 encoded binary blob to a raw.bin
-    global $today, $now;
+function logPayload ($payload) {
+    global $today, $now, $config;
     try {
-        file_put_contents( $datapath.'/raw.bin', $today.' '.$now.'|'.base64_encode($payload).PHP_EOL, FILE_APPEND);
+        file_put_contents(
+            $config['outputPath'].'/raw.bin',
+            $today.' '.$now.'|'.base64_encode($payload).PHP_EOL,
+            FILE_APPEND);
     } catch (Exception $e) {
         http_response_code(500);
-        die('Cannot create file '.$datapath.'/raw.bin');
+        die('Cannot create file '.$config['outputPath'].'/raw.bin');
     }
-    logthis('Debug', 'Request-Body: '.base64_encode($payload));
+    logger('Debug', 'Request-Body: '.base64_encode($payload));
 }
-
-function logData ($datapath, $Datalog) {
 // Write data to daily csv file
-    global $today, $now;
-    $csvFile = $datapath.'/'.$today.'.csv';
+function logData ($Datalog) {
+    global $today, $now, $config;
+    $csvFile = $config['outputPath'].'/'.$today.'.csv';
     if ( !is_file($csvFile) ) {
+        $header = '# Date Time, TodaykWh, inVolt, inAmp, inWatt, outVolt, outAmp, outWatt, Temp';
         try {
-            file_put_contents($csvFile,'# Date Time, TodaykWh, inVolt, inAmp, inWatt, outVolt, outAmp, outWatt, Temp'.PHP_EOL);
+            file_put_contents($csvFile, $header.PHP_EOL);
         } catch (Exception $e) {
             http_response_code(500);
             die('Cannot create file '.$csvFile);
@@ -63,25 +81,15 @@ function logData ($datapath, $Datalog) {
         $Datalog['Vpv'], $Datalog['Ipv'], $Datalog['Ppv'], $Datalog['Vac'], 
         $Datalog['Iac'], $Datalog['Pac'], $Datalog['Temp']).PHP_EOL;
     file_put_contents($csvFile, $csvString, FILE_APPEND);
-    logthis('Debug','Values: '.$csvString);
+    logger('Debug','Values: '.$csvString);
 }
 
-function QueryA ($hostname) {
-    global $DNSServers;
-    shuffle($DNSServers); // randomize what DNS host we query
-    foreach ( $DNSServers as $DNShost ) {
-        $DNSQuery = new DNSQuery($DNShost, 53, 1);
-        $result = $DNSQuery->Query($hostname, 'A');
-        if ( ($result===false) || ($DNSQuery->error!=0) ) { continue; }
-        $result_count=$result->count; // number of results returned
-        for ($a=0; $a<$result->count; $a++) { $records[] = $result->results[$a]->data; }
-        shuffle($records); // randomize the IP-address we return
-        return($records[0]);
-    }
-}
-
-function postGoodwe ($config, $payload) {
 // Post data to Goodwe 
+function postGoodwe ($payload) {
+    global $today, $now, $config;
+    if (!$config['Goodwe']['enabled']) {
+        return;
+    }
     // Content-Length is prefixed with a 0
     $contentLength = sprintf("%03d",strlen($payload));
     // Headers can be unset by providing empty headers
@@ -94,8 +102,8 @@ function postGoodwe ($config, $payload) {
 
     $ch = curl_init();
 
-    logthis('Debug', 'Goodwe Headers: '.json_encode($headers));
-    curl_setopt($ch, CURLOPT_URL,$config['URL']);
+    logger('Debug', 'Goodwe Headers: '.json_encode($headers));
+    curl_setopt($ch, CURLOPT_URL,$config['Goodwe']['URL']);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
@@ -105,27 +113,32 @@ function postGoodwe ($config, $payload) {
     $req_info = curl_getinfo($ch);
 
     curl_close ($ch);
-    logthis('Debug', 'Goodwe Response: '.base64_encode($req_output));
-    logthis('Debug', 'Goodwe cURL info: '.json_encode($req_info));
+    logger('Debug', 'Goodwe Response: '.base64_encode($req_output));
+    logger('Debug', 'Goodwe cURL info: '.json_encode($req_info));
+    file_put_contents(
+        $config['outputPath'].'/goodwe.out',
+        $req_info['http_code'].'|'.$req_output.PHP_EOL,
+        FILE_APPEND);
     return $req_output;
-    file_put_contents('/var/log/goodwe/goodwe.out', $req_info['http_code'].'|'.$req_output.PHP_EOL, FILE_APPEND);
 }
 
-function postPVOutput ($config, $Datalog) {
 // Post data to PVOutput
-    global $today, $now;
-    $ch = curl_init();
-
-    $headers = array('X-Pvoutput-Apikey: '.$config['apiKey'], 
-        'X-Pvoutput-SystemId: '.$config['sysId'],
+function postPVOutput ($Datalog) {
+    global $today, $now, $config;
+    if (!$config['PVOutput']['enabled']) {
+        return;
+    }
+    $headers = array('X-Pvoutput-Apikey: '.$config['PVOutput']['apiKey'], 
+        'X-Pvoutput-SystemId: '.$config['PVOutput']['sysId'],
         'X-Rate-Limit: 1'); 
     $today = str_replace('-','',$today); // yyyy-mm-dd to yyyymmdd
     $now = substr($now,0,5); // hh:mm:ss to hh:mm
-    $postBody = "d=${today}&t=${now}&v2=${Datalog['Pac']}&v5=${Datalog['Temp']}&v6=${Datalog['Vpv']}";
-    logthis('Debug', 'PVOutput Headers: '.json_encode($headers));
-    logthis('Debug', 'PVOutput Body: '.$postBody);
+    $postBody = "d={$today}&t={$now}&v2={$Datalog['Pac']}&v5={$Datalog['Temp']}&v6={$Datalog['Vpv']}";
+    logger('Debug', 'PVOutput Body: '.$postBody);
+    logger('Debug', 'PVOutput Headers: '.json_encode($headers));
 
-    curl_setopt($ch, CURLOPT_URL,$config['URL']);
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL,$config['PVOutput']['URL']);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $postBody);
@@ -135,12 +148,12 @@ function postPVOutput ($config, $Datalog) {
     $req_info = curl_getinfo($ch);
 
     curl_close ($ch);
-    logthis('Debug', 'PVOutput Response: '.$req_output);
-    logthis('Debug', 'PVOutput cURL info: '.json_encode($req_info));
+    logger('Debug', 'PVOutput Response: '.$req_output);
+    logger('Debug', 'PVOutput cURL info: '.json_encode($req_info));
     if ($req_info['http_code'] > 299) {
-        logthis('Error','PVOutput: '.$req_info['http_code'].'|'.$req_output);
+        logger('Error','PVOutput: '.$req_info['http_code'].'|'.$req_output);
     }
-    file_put_contents('/var/log/goodwe/goodwe.out', $req_info['http_code'].'|'.$req_output.'|'.$postBody.PHP_EOL, FILE_APPEND);
+    file_put_contents($config['outputPath'].'/pvoutput.out', $req_info['http_code'].'|'.$req_output.'|'.$postBody.PHP_EOL, FILE_APPEND);
 //   return $req_output;
 }
 
@@ -166,9 +179,13 @@ function process66 ($payload, &$Datalog) {
     $Datalog['todaykWh'] = $values["todaykWh"] * 0.1;
 
     $Datalog['Ppv'] = (($values["Vpv1"]*$values["Ipv1"])+($values["Vpv2"]*$values["Ipv2"]))*0.01;
-    $Datalog['efficiency'] = $Pac/$Ppv;
+    if ($Datalog['Ppv'] == 0) {
+        $Datalog['efficiency'] = 0;
+    } else {
+        $Datalog['efficiency'] = $Datalog['Pac']/$Datalog['Ppv'];
+    }
 
-    logthis('Debug', 'Parsed values: '.json_encode($Datalog));
+    logger('Debug', 'Parsed values: '.json_encode($Datalog));
 } // function process66
 
 function process43 ($payload, &$Datalog) {
@@ -181,13 +198,16 @@ function process43 ($payload, &$Datalog) {
     $Datalog['inverterID'] = $values["inverterID"];
 } // function process43
 
+//////////////////////////////////////////////////////////////////////////
+// Main
+
 date_default_timezone_set('CET');
 $now = date("H:i:s");
 $today = date("Y-m-d");
 
 $payload = file_get_contents("php://input");
 // Log payload irrespective of content
-logPayload($config['outputPath'], $today, $now, $payload);
+logPayload($payload);
 
 if ($_SERVER['REQUEST_METHOD'] != 'POST') {
     http_response_code(501);
@@ -195,19 +215,24 @@ if ($_SERVER['REQUEST_METHOD'] != 'POST') {
 }
 if (strlen($payload) < 17) {
 // Need the inverterID at minimum
-    http_response_code(501);
-    die('Post body too short: '.strlen($payload).' sent, minimum 17 required');
+    //http_response_code(501);
+    $responseBody = postGoodwe($payload);
+    print($responseBody);
+ 
+    // die('Post body too short: '.strlen($payload).' sent, minimum 17 required');
 } elseif (strlen($payload) < 66) {
 // First payload of the day is short (43 char)
     process43($payload, $Datalog);
+    $responseBody = postGoodwe($payload);
     // Don't know what the rest of the payload is... taken from capture
     print($Datalog['inverterID'].hex2bin('00000000037a'));
+    // print($responseBody);
 } else {
 // Full payload
     process66($payload, $Datalog);
-#    $responseBody = postGoodwe($config['Goodwe'], $payload);
-    postPVOutput($config['PVOutput'], $Datalog);
-    logData($config['outputPath'], $Datalog);
+    $responseBody = postGoodwe($payload);
+    postPVOutput($Datalog);
+    logData($Datalog);
     // Echo response from Goodwe to the client
     print($responseBody);
 }

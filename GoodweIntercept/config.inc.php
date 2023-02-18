@@ -15,32 +15,35 @@ $config = array(
 // The logging level (emergency, alert, critical, error, warning, notice, info, debug)
 'logLevel' => 'debug',
 
-// DNS servers to query for www.goodwe-power.com
-'DNSServers' => array('1.0.0.1', '1.1.1.1', '8.8.4.4', '8.8.8.8', '9.9.9.9', '149.112.112.112'),
-
 // Parameters for Goodwe connection and device
 'Goodwe' => array(
-//
-// The ID of the inverter
-// In top-left of www.semsportal.com page for the inverter
-// Looks like: 13600DSU12300045
-'inverterSN' => '',
+    // Will post to Goodwe if true
+    'enabled' => true,
 
-// URL where to post data to
-'URL' => 'http://47.254.132.36/Acceptor/Datalog',
+    // The ID of the inverter
+    // In top-left of www.semsportal.com page for the inverter
+    // Looks like: 13600DSU12300045
+    'inverterSN' => '',
+
+    // URL where to post data to
+    'URL' => 'http://47.254.132.36/Acceptor/Datalog',
 ), // Goodwe array
 
 // Parameters for PVOutput connection and device
 'PVOutput' => array(
-//
-// https://pvoutput.org/account.jsp API key field
-'apiKey' => '',
+    // Will post to PVOutput if true
+    // Note that PVOutput requires data very 5 minutes and
+    // your inverter has a different update frequency
+    'enabled' => true,
 
-// https://pvoutput.org/account.jsp System Id field
-'sysId' => '',
+    // https://pvoutput.org/account.jsp API key field
+    'apiKey' => '',
 
-// URL for posting status
-'URL' => 'https://pvoutput.org/service/r2/addstatus.jsp',
+    // https://pvoutput.org/account.jsp System Id field
+    'sysId' => '',
+
+    // URL for posting status
+    'URL' => 'https://pvoutput.org/service/r2/addstatus.jsp',
 ), // PVOutput array
 
 ); // config array
