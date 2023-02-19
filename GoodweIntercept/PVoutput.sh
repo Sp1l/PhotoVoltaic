@@ -72,19 +72,21 @@ loadConfig () {
 
 loadPVOutput () {
     # Parse the stored payload
+    cnt=0
     [ ! -f "${CSVdir}/${today}.csv" ] && return 1
     for item in $(tail -n1 "${CSVdir}/${today}.csv"); do
         cnt=$((cnt+1))
         case "$cnt" in
-            1) logdate=${item};;
-            2) logtime=${item%,};;
-            3) todaykWh=${item%,};;
-            4) inVolt=${item%,};;
-            5) inAmp=${item%,};;
-            6) inWatt=${item%,};;
-            7) outVolt=${item%,};;
-            8) outAmp=${item%,};;
-            9) temperature=${item%,};;
+            #1)  logdate=${item};;
+            #2)  logtime=${item%,};;
+            #3)  todaykWh=${item%,};;
+            4)  inVolt=${item%,};;
+            #5)  inAmp=${item%,};;
+            #6)  inWatt=${item%,};;
+            #7)  outVolt=${item%,};;
+            #8)  outAmp=${item%,};;
+            9)  outWatt=${item%,};;
+            10) temperature=${item};;
         esac
     done
 }
@@ -103,7 +105,7 @@ uploadPVOutput () {
     postResp=$(curl -si --url "${pvoutputURL}" \
         -H "X-Pvoutput-Apikey: ${apiKey}" -H "X-Pvoutput-SystemId: ${sysId}" \
         -H "X-Rate-Limit: 1" -d "d=${date}" -d "t=${time}" \
-        -d "v2=${outAmp}" -d "v5=${temperature}" -d "v6=${inVolt}")
+        -d "v2=${outWatt}" -d "v5=${temperature}" -d "v6=${inVolt}")
     if [ $? -eq 0 ] ; then
         ratelimitRemain=${postResp#*X-Rate-Limit-Remaining: }
         ratelimitRemain=${ratelimitRemain%%,*}
@@ -162,6 +164,7 @@ while : ; do # Infinite loop
         [ "${ONESHOT}" ] && exit 0
         sleep $((nextStart-now))
     else
+        cp "${CSVdir}/${today}.csv" "${outputPath}/"
         [ "${dailyRestart}" ] && exit 0
         waitTillSunrise
     fi
