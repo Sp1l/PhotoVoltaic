@@ -37,37 +37,37 @@ ENDOFUSAGE
 }
 
 logErr () {
-    echo "$*" >> ${outputPath}/${logFile}.err
+    echo "$*" >> "${outputPath}/${logFile}.err"
 }
 
 logOut () {
     [ -z "${DEBUG}" ] && return
-    echo "$*" >> ${outputPath}/${logFile}.log
+    echo "$*" >> "${outputPath}/${logFile}.log"
 } 
 
 exitErr () {
-    [ "${outputPath}" ] && logErr $*
+    [ "${outputPath}" ] && logErr "$@"
     echo -e "\033[1;31mERROR: \033[0m\033[1m$*\033[0m"
     usage
     exit 1
 } 
 
 loadConfig () {
-    local confFile="${1:-config.sh}"
-    [ "${confFile}" = "${confFile%/*}" ] && confFile=`pwd`"/${confFile}"
+    confFile="${1:-config.sh}"
+    [ "${confFile}" = "${confFile%/*}" ] && confFile="$PWD/${confFile}"
     if   [ -f "${confFile}" ] ; then confFile="${confFile}"
     elif [ -f "${scriptDir}/${confFile}" ] ; then confFile="${scriptDir}/${confFile}"
     else exitErr "Config file ${confFile} not found"
     fi
     . "${confFile}"
     outputPath=${outputPath:-.}
-    [ ${logFile:-unset} == "unset" ] && logFile="${scriptName%.*}"
-    [ ${apiKey:-unset} == "unset" ] && exitErr "apiKey unset or empty"
-    [ ${sysId:-unset} == "unset" ] && exitErr "sysId unset or empty"
-    [ ${latitude:-unset} == "unset" ] && exitErr "latitude unset or empty"
-    [ ${longitude:-unset} == "unset" ] && exitErr "longitude unset or empty"
-    [ ${CSVdir:-unset} == "unset" ] && exitErr "CSVdir unset or empty"
-    [ -n "${timezone}" ] && export TZ=${timezone}
+    [ "${logFile:-unset}" = "unset" ] && logFile="${scriptName%.*}"
+    [ "${apiKey:-unset}" = "unset" ] && exitErr "apiKey unset or empty"
+    [ "${sysId:-unset}" = "unset" ] && exitErr "sysId unset or empty"
+    [ "${latitude:-unset}" = "unset" ] && exitErr "latitude unset or empty"
+    [ "${longitude:-unset}" = "unset" ] && exitErr "longitude unset or empty"
+    [ "${CSVdir:-unset}" = "unset" ] && exitErr "CSVdir unset or empty"
+    [ -n "${timezone}" ] && export TZ="${timezone}"
 }
 
 loadPVOutput () {
@@ -100,7 +100,7 @@ uploadPVOutput () {
     date="${year}${month}${day}"
 
     # POST data to PVOutput
-    local postResp=$(curl -si --url "${pvoutputURL}" \
+    postResp=$(curl -si --url "${pvoutputURL}" \
         -H "X-Pvoutput-Apikey: ${apiKey}" -H "X-Pvoutput-SystemId: ${sysId}" \
         -H "X-Rate-Limit: 1" -d "d=${date}" -d "t=${time}" \
         -d "v2=${outAmp}" -d "v5=${temperature}" -d "v6=${inVolt}")
@@ -121,18 +121,18 @@ uploadPVOutput () {
 waitTillSunrise () {
     # No need to poll or push when the sun isn't shining
     now=$(date '+%s')
-    sunrise=$(sscalc -a $latitude -o $longitude -f '%s')
-    sunset=${sunrise#*  }
-    sunrise=${sunrise%  *}
-    if   [ $now -lt $sunrise ] ; then
+    sunrise=$(sscalc -a "${latitude}" -o "${longitude}" -f '%s')
+    sunset="${sunrise#*  }"
+    sunrise="${sunrise%  *}"
+    if   [ "${now}" -lt "${sunrise}" ] ; then
         sleep $((sunrise-now))
-    elif [ $now -gt $sunset ] ; then
-        local tomorrow=$(date -v +1d '+%m-%d')
-        sunrise=$(sscalc -d ${tomorrow#*-} -m ${tomorrow%-*} \
-               -a $latitude -o $longitude -f '%s')
-        sunset=${sunrise#*  }
-        sunrise=${sunrise%  *}
-        local waitSeconds=$((sunrise-now-margin))
+    elif [ "${now}" -gt "${sunset}" ] ; then
+        tomorrow=$(date -v +1d '+%m-%d')
+        sunrise=$(sscalc -d "${tomorrow#*-}" -m "${tomorrow%-*}" \
+               -a "${latitude}" -o "${longitude}" -f '%s')
+        sunset="${sunrise#*  }"
+        sunrise="${sunrise%  *}"
+        waitSeconds=$((sunrise-now-margin))
         logOut "Waiting for sunrise (${waitSeconds})"
         [ -z "${ONESHOT}" ] && sleep ${waitSeconds}
     fi
@@ -144,20 +144,20 @@ loadConfig "$*"
 # Redirect output and error to file
 exec 1<&-
 exec 2<&-
-exec 1>>${outputPath}/${logFile}.out
-exec 2>>${outputPath}/${logFile}.err
+exec 1>>"${outputPath}/${logFile}.out"
+exec 2>>"${outputPath}/${logFile}.err"
 
 waitTillSunrise # sets today, sunrise, sunset
 nextStart=$(date '+%s') # Initialize
 
 while : ; do # Infinite loop
-    nextStart=$((nextStart+interval))
-    if [ $lastStart -lt $((sunset+margin)) ] ; then
+    if [ "${nextStart}" -lt $((sunset+margin)) ] ; then
+        nextStart=$((nextStart+interval))
         time=$(date '+%H:%M')
 
         loadPVOutput && uploadPVOutput
 
-        now=`date "+%s"`
+        now=$(date "+%s")
         logOut "Sleep for $((nextStart-now)) seconds"
         [ "${ONESHOT}" ] && exit 0
         sleep $((nextStart-now))
