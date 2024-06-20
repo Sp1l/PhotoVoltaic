@@ -11,8 +11,8 @@ if ( ! defined( 'ABSPATH' ) ) {
     define('ABSPATH', dirname( __FILE__ ) . '/' );
 }
 
-# ini_set('display_errors', 1);
-# error_reporting(E_ALL);
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 
 define( "LOGLEVEL",
     array(
@@ -30,8 +30,8 @@ define( "LOGLEVEL",
 // Load configuration
 require_once( ABSPATH . "config.inc.php");
 
-// Log errors to file
 function logger ($severity, $message) {
+// Log errors to file
     global $today, $now, $config;
     if ( is_null(LOGLEVEL[strtolower($severity)]) || 
          LOGLEVEL[strtolower($severity)] > LOGLEVEL[strtolower($config['logLevel'])] ) { 
@@ -49,22 +49,27 @@ function logger ($severity, $message) {
     }
 }
 
+function logPayload ($request = '', $response = '') {
 // base64 encoded binary blob to a raw.bin
-function logPayload ($payload) {
     global $today, $now, $config;
+    if ( strlen($request)  > 0 ) { $request  = base64_encode($request); }
+    if ( strlen($response) > 0 ) { $response = base64_encode($response); }
     try {
+        $filename = str_replace('/','_',ltrim($_SERVER['REQUEST_URI'],'/')).'.base64';
         file_put_contents(
-            $config['outputPath'].'/raw.bin',
-            $today.' '.$now.'|'.base64_encode($payload).PHP_EOL,
+            $config['outputPath'].'/'.$filename,
+            $today.' '.$now.'|'.$request.'|'.$response.PHP_EOL,
             FILE_APPEND);
     } catch (Exception $e) {
         http_response_code(500);
-        die('Cannot create file '.$config['outputPath'].'/raw.bin');
+        die('Cannot create file '.$config['outputPath'].'/'.$filename);
     }
-    logger('Debug', 'Request-Body: '.base64_encode($payload));
+    logger('Debug', 'Request-Body:  '.$request);
+    logger('Debug', 'Response-Body: '.$response);
 }
-// Write data to daily csv file
+
 function logData ($Datalog) {
+// Write data to daily csv file
     global $today, $now, $config;
     $csvFile = $config['outputPath'].'/'.$today.'.csv';
     if ( !is_file($csvFile) ) {
@@ -84,8 +89,8 @@ function logData ($Datalog) {
     logger('Debug','Values: '.$csvString);
 }
 
-// Post data to Goodwe 
 function postGoodwe ($payload) {
+// Post data to Goodwe 
     global $today, $now, $config;
     if (!$config['Goodwe']['enabled']) {
         return;
@@ -102,12 +107,13 @@ function postGoodwe ($payload) {
 
     $ch = curl_init();
 
+    $url = $config['Goodwe']['URL'].$_SERVER['REQUEST_URI'];
     logger('Debug', 'Goodwe Headers: '.json_encode($headers));
-    curl_setopt($ch, CURLOPT_URL,$config['Goodwe']['URL']);
+    curl_setopt($ch, CURLOPT_URL,$url);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POST, 1);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 
     $req_output = curl_exec($ch);
     $req_info = curl_getinfo($ch);
@@ -117,13 +123,13 @@ function postGoodwe ($payload) {
     logger('Debug', 'Goodwe cURL info: '.json_encode($req_info));
     file_put_contents(
         $config['outputPath'].'/goodwe.out',
-        $req_info['http_code'].'|'.$req_output.PHP_EOL,
+        $today.' '.$now.'|'.$_SERVER['REQUEST_URI'].'|'.$req_info['http_code'].'|'.base64_encode($req_output).PHP_EOL,
         FILE_APPEND);
     return $req_output;
 }
 
-// Post data to PVOutput
 function postPVOutput ($Datalog) {
+// Post data to PVOutput
     global $today, $now, $config;
     if (!$config['PVOutput']['enabled']) {
         return;
@@ -205,36 +211,37 @@ date_default_timezone_set('CET');
 $now = date("H:i:s");
 $today = date("Y-m-d");
 
-$payload = file_get_contents("php://input");
-// Log payload irrespective of content
-logPayload($payload);
+$requestURI = $_SERVER['REQUEST_URI'];
+$requestBody = file_get_contents("php://input");
 
 if ($_SERVER['REQUEST_METHOD'] != 'POST') {
+    if ( strlen($requestBody) > 0 ) { logPayload($requestBody); }
+    logger('error', $_SERVER['REQUEST_METHOD'].' '.$_SERVER['REQUEST_URI']);
     http_response_code(501);
     die('HTTP Method "'.$_SERVER['REQUEST_METHOD'].'" not implemented');
 }
-if (strlen($payload) < 17) {
+if (strlen($requestBody) < 17) {
 // Need the inverterID at minimum
-    //http_response_code(501);
-    $responseBody = postGoodwe($payload);
-    print($responseBody);
- 
-    // die('Post body too short: '.strlen($payload).' sent, minimum 17 required');
-} elseif (strlen($payload) < 66) {
+    $responseBody = postGoodwe($requestBody);
+    // die('Post body too short: '.strlen($requestBody).' sent, minimum 17 required');
+} elseif (strlen($requestBody) < 66) {
 // First payload of the day is short (43 char)
-    process43($payload, $Datalog);
-    $responseBody = postGoodwe($payload);
+    process43($requestBody, $Datalog);
+    $responseBody = postGoodwe($requestBody);
     // Don't know what the rest of the payload is... taken from capture
     print($Datalog['inverterID'].hex2bin('00000000037a'));
-    // print($responseBody);
 } else {
 // Full payload
-    process66($payload, $Datalog);
-    $responseBody = postGoodwe($payload);
+    process66($requestBody, $Datalog);
+    $responseBody = postGoodwe($requestBody);
     postPVOutput($Datalog);
     logData($Datalog);
-    // Echo response from Goodwe to the client
-    print($responseBody);
 }
+
+// Log payload irrespective of content
+logPayload($requestBody, $responseBody);
+
+// Echo response from Goodwe to the client
+print($responseBody);
 
 ?>
